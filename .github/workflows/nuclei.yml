@@ -117,11 +117,25 @@ jobs:
           CMD="${{ inputs.command }}"
           MODE="${{ inputs.notification_mode }}"
           BULK="${{ inputs.bulk_filename }}"
-         
+
           echo "Starting scan: $(date)"
-         
+          echo "Input: $FILE ($(wc -l < "$FILE") lines)"
+          echo "Command: $CMD"
+
+          # Smart routing: if command uses nuclei, use -l flag for proper target loading
+          if echo "$CMD" | grep -q "nuclei"; then
+            # Replace piped input with -l flag for nuclei
+            MODIFIED_CMD=$(echo "$CMD" | sed "s|nuclei |nuclei -l $FILE |g")
+            echo "Using nuclei -l mode: $MODIFIED_CMD"
+            RUN_CMD="$MODIFIED_CMD"
+          else
+            # For other tools (subfinder, httpx, etc.) keep pipe approach
+            RUN_CMD="cat $FILE | eval $CMD"
+            echo "Using pipe mode"
+          fi
+
           if [[ "$MODE" == "bulk" ]]; then
-            cat "$FILE" | eval "$CMD" > "$BULK" && {
+            eval "$RUN_CMD" > "$BULK" 2>&1 && {
               [[ -s "$BULK" ]] && {
                 LINES=$(wc -l < "$BULK")
                 echo "Results: $LINES lines"
@@ -135,18 +149,28 @@ jobs:
                   -d "text=ℹ️ No results found"
               }
             } || {
-              curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendMessage" \
-                -d "chat_id=${TELEGRAM_CHAT_ID}" \
-                -d "text=❌ Scan failed"
-              exit 1
+              echo "⚠️ Scan command returned errors (may still have results)"
+              [[ -s "$BULK" ]] && {
+                LINES=$(wc -l < "$BULK")
+                echo "Results despite errors: $LINES lines"
+                curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendDocument" \
+                  -F "chat_id=${TELEGRAM_CHAT_ID}" \
+                  -F "document=@${BULK}" \
+                  -F "caption=⚠️ Scan completed with warnings: ${LINES} results" && echo "File sent"
+              } || {
+                curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendMessage" \
+                  -d "chat_id=${TELEGRAM_CHAT_ID}" \
+                  -d "text=❌ Scan failed"
+                exit 1
+              }
             }
           else
-            cat "$FILE" | eval "$CMD" | notify -pc notify.yml -silent || {
+            eval "$RUN_CMD" | notify -pc notify.yml -silent || {
               echo "❌ Scan failed" | notify -pc notify.yml -silent
               exit 1
             }
           fi
-         
+
           echo "Completed: $(date)"
          
       - name: Upload results
