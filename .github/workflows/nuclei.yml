@@ -137,7 +137,7 @@ jobs:
           fi
 
           if [[ "$MODE" == "bulk" ]]; then
-            eval "$RUN_CMD" > "$BULK" 2>&1 && {
+            eval "$RUN_CMD" > "$BULK" && {
               [[ -s "$BULK" ]] && {
                 LINES=$(wc -l < "$BULK")
                 echo "Results: $LINES lines"
@@ -151,7 +151,7 @@ jobs:
                   -d "text=ℹ️ No results found"
               }
             } || {
-              echo "⚠️ Scan command returned errors (may still have results)"
+              echo "⚠️ Scan command returned non-zero exit code (may still have results)"
               [[ -s "$BULK" ]] && {
                 LINES=$(wc -l < "$BULK")
                 echo "Results despite errors: $LINES lines"
