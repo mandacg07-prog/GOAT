@@ -79,7 +79,9 @@ jobs:
 
       - name: Clone templates
         if: steps.cache-templates.outputs.cache-hit != 'true'
-        run: git clone --depth 1 https://github.com/projectdiscovery/nuclei-templates.git ~/nuclei-templates
+        run: |
+          rm -rf ~/nuclei-templates
+          git clone --depth 1 https://github.com/projectdiscovery/nuclei-templates.git ~/nuclei-templates
 
       - name: Link templates
         run: ln -sf ~/nuclei-templates $GITHUB_WORKSPACE/nuclei-templates
