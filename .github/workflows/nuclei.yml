@@ -137,7 +137,11 @@ jobs:
           fi
 
           if [[ "$MODE" == "bulk" ]]; then
-            eval "$RUN_CMD" > "$BULK" && {
+            eval "$RUN_CMD" > "$BULK.raw" 2>&1
+            # Clean results: remove nuclei banner, warnings, info messages — keep only findings
+            grep -v -E '^\[|^[[:space:]]*$|^__|^ *____|^ *\/|^ *|_|^ *projectdiscovery|^ *v[0-9]|Nuclei Templates|ADDED|MODIFIED|REMOVED' "$BULK.raw" > "$BULK" 2>/dev/null || true
+            {
+            [[ -s "$BULK" ]] && {
               [[ -s "$BULK" ]] && {
                 LINES=$(wc -l < "$BULK")
                 echo "Results: $LINES lines"
