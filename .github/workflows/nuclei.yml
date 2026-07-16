@@ -140,36 +140,18 @@ jobs:
             eval "$RUN_CMD" > "$BULK.raw" 2>&1
             # Clean results: remove nuclei banner, warnings, info messages — keep only findings
             grep -v -E '^\[|^[[:space:]]*$|^__|^ *____|^ *\/|^ *|_|^ *projectdiscovery|^ *v[0-9]|Nuclei Templates|ADDED|MODIFIED|REMOVED' "$BULK.raw" > "$BULK" 2>/dev/null || true
-            {
-            [[ -s "$BULK" ]] && {
-              [[ -s "$BULK" ]] && {
-                LINES=$(wc -l < "$BULK")
-                echo "Results: $LINES lines"
-                curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendDocument" \
-                  -F "chat_id=${TELEGRAM_CHAT_ID}" \
-                  -F "document=@${BULK}" \
-                  -F "caption=✅ Scan completed: ${LINES} results" && echo "File sent"
-              } || {
-                curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendMessage" \
-                  -d "chat_id=${TELEGRAM_CHAT_ID}" \
-                  -d "text=ℹ️ No results found"
-              }
-            } || {
-              echo "⚠️ Scan command returned non-zero exit code (may still have results)"
-              [[ -s "$BULK" ]] && {
-                LINES=$(wc -l < "$BULK")
-                echo "Results despite errors: $LINES lines"
-                curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendDocument" \
-                  -F "chat_id=${TELEGRAM_CHAT_ID}" \
-                  -F "document=@${BULK}" \
-                  -F "caption=⚠️ Scan completed with warnings: ${LINES} results" && echo "File sent"
-              } || {
-                curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendMessage" \
-                  -d "chat_id=${TELEGRAM_CHAT_ID}" \
-                  -d "text=❌ Scan failed"
-                exit 1
-              }
-            }
+            if [[ -s "$BULK" ]]; then
+              LINES=$(wc -l < "$BULK")
+              echo "Results: $LINES lines"
+              curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendDocument" \
+                -F "chat_id=${TELEGRAM_CHAT_ID}" \
+                -F "document=@${BULK}" \
+                -F "caption=✅ Scan completed: ${LINES} results" && echo "File sent"
+            else
+              curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendMessage" \
+                -d "chat_id=${TELEGRAM_CHAT_ID}" \
+                -d "text=ℹ️ No results found"
+            fi
           else
             eval "$RUN_CMD" | notify -pc notify.yml -silent || {
               echo "❌ Scan failed" | notify -pc notify.yml -silent
