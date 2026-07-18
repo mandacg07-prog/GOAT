@@ -27,23 +27,22 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
-   
+
     steps:
       - uses: actions/checkout@v4
-         
+
       - name: Cache tools
         id: cache-tools
         uses: actions/cache@v4
         with:
           path: ~/tools
           key: pdtools-v2-${{ runner.os }}
-         
+
       - name: Install tools
         if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/tools && cd ~/tools
-         
-          # Download ProjectDiscovery tools (original)
+
           for tool in "subfinder:2.12.0" "httpx:1.8.1" "nuclei:3.7.0" "katana:1.4.0" "naabu:2.4.0" "alterx:0.1.0"; do
             name=${tool%:*}
             ver=${tool#*:}
@@ -51,13 +50,12 @@ jobs:
             unzip -o -q "${name}_${ver}_linux_amd64.zip"
             rm "${name}_${ver}_linux_amd64.zip"
           done
-          # Download notify separately (original)
           wget -q "https://github.com/projectdiscovery/notify/releases/download/v1.0.7/notify_1.0.7_linux_amd64.zip"
           unzip -o -q notify_1.0.7_linux_amd64.zip
           rm notify_1.0.7_linux_amd64.zip
 
           echo "Tools installed"
-         
+
       - name: Setup PATH
         run: |
           echo "$HOME/tools" >> $GITHUB_PATH
@@ -68,7 +66,7 @@ jobs:
           ~/tools/naabu -version
           ~/tools/alterx -version
           ~/tools/notify -version
-         
+
       - name: Cache templates
         id: cache-templates
         uses: actions/cache@v4
@@ -85,7 +83,7 @@ jobs:
 
       - name: Link templates
         run: ln -sf ~/nuclei-templates $GITHUB_WORKSPACE/nuclei-templates
-         
+
       - name: Setup notify
         env:
           TELEGRAM_API_KEY: ${{ secrets.TELEGRAM_API_KEY }}
@@ -99,7 +97,7 @@ jobs:
               telegram_format: "{{data}}"
               telegram_parsemode: "Markdown"
           EOF
-         
+
       - name: Verify input
         run: |
           [[ -f "upload/${{ inputs.file_name }}" ]] || {
@@ -108,7 +106,7 @@ jobs:
             exit 1
           }
           echo "Input file: upload/${{ inputs.file_name }} ($(wc -l < upload/${{ inputs.file_name }}) lines)"
-         
+
       - name: Execute scan
         env:
           TELEGRAM_API_KEY: ${{ secrets.TELEGRAM_API_KEY }}
@@ -124,22 +122,24 @@ jobs:
           echo "Input: $FILE ($(wc -l < "$FILE") lines)"
           echo "Command: $CMD"
 
-          # Smart routing: if command uses nuclei, use -l flag for proper target loading
           if echo "$CMD" | grep -q "nuclei"; then
-            # Replace piped input with -l flag for nuclei
             MODIFIED_CMD=$(echo "$CMD" | sed "s|nuclei |nuclei -l $FILE |g")
             echo "Using nuclei -l mode: $MODIFIED_CMD"
             RUN_CMD="$MODIFIED_CMD"
           else
-            # For other tools (subfinder, httpx, etc.) keep pipe approach
             RUN_CMD="cat $FILE | eval $CMD"
             echo "Using pipe mode"
           fi
 
           if [[ "$MODE" == "bulk" ]]; then
-            eval "$RUN_CMD" > "$BULK.raw" 2>&1
-            # Clean results: remove nuclei banner, warnings, info messages — keep only findings
-            grep -v -E '^\[|^[[:space:]]*$|^__|^ *____|^ *\/|^ *|_|^ *projectdiscovery|^ *v[0-9]|Nuclei Templates|ADDED|MODIFIED|REMOVED' "$BULK.raw" > "$BULK" 2>/dev/null || true
+            # Capture stdout only — banners/[INF]/[WRN] logs from these tools go to stderr,
+            # so keeping them out of the raw file avoids needing a fragile cleanup regex.
+            eval "$RUN_CMD" > "$BULK.raw" 2>/dev/null
+
+            # Safety-net filter in case any log noise still lands in stdout for some tool/flag combo.
+            grep -v -E '^\[(INF|WRN|ERR|DBG)\]|^[[:space:]]*$|projectdiscovery\.io|^[[:space:]]*[_/\\|]+[[:space:]]*$|Nuclei Templates|ADDED|MODIFIED|REMOVED' "$BULK.raw" > "$BULK" 2>/dev/null || cp "$BULK.raw" "$BULK"
+            rm -f "$BULK.raw"
+
             if [[ -s "$BULK" ]]; then
               LINES=$(wc -l < "$BULK")
               echo "Results: $LINES lines"
@@ -160,7 +160,7 @@ jobs:
           fi
 
           echo "Completed: $(date)"
-         
+
       - name: Upload results
         if: inputs.notification_mode == 'bulk'
         uses: actions/upload-artifact@v4
@@ -168,7 +168,7 @@ jobs:
           name: scan-results
           path: ${{ inputs.bulk_filename }}
           retention-days: 7
-         
+
       - name: Cleanup
         if: always()
         run: |
