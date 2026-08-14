@@ -1,0 +1,15 @@
+zlty49385.vci.att.com
+ztapm-aznprd1.azprv.3pc.att.com
+ztapm-dev1.aws.3pc.att.com
+ztapm-dev2.aws.3pc.att.com
+ztapm-deveast.az.3pc.att.com
+ztapm-grafana-dev1.aws.3pc.att.com
+ztapm-grafana-dev2.aws.3pc.att.com
+ztapm-grafana-nprd1.aws.3pc.att.com
+ztapm-grafana-prod1.aws.3pc.att.com
+ztapm-nprd1.aws.3pc.att.com
+ztapm-prod1.aws.3pc.att.com
+ztapm-prom-dev1.aws.3pc.att.com
+ztapm-prom-dev2.aws.3pc.att.com
+ztapm-prom-nprd1.aws.3pc.att.com
+ztapm-prom-prod1.aws.3pc.att.com
